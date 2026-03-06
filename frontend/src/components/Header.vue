@@ -6,9 +6,18 @@
     <div class="header_button">
         |
         <span>Model: </span>
-        <select v-model="select_model_id">
-            <option v-for="model_id in avaliable_model_ids" :value="model_id">{{ model_id }}</option>
-        </select>
+        <input 
+            type="text" 
+            v-model="select_model_id" 
+            list="model_suggestions" 
+            placeholder="Enter HuggingFace model ID..."
+            class="model-input"
+            @keyup.enter="loadModel"
+        />
+        <datalist id="model_suggestions">
+            <option v-for="model_id in suggested_model_ids" :value="model_id">{{ model_id }}</option>
+        </datalist>
+        <button @click="loadModel" class="load-btn">Load</button>
         <span> | </span>
         <span>Hardware: </span>
         <select v-model="select_hardware">
@@ -73,18 +82,19 @@ const global_update_trigger = inject('global_update_trigger');
 const ip_port = inject('ip_port');
 
 const avaliable_hardwares = ref([]);
-const avaliable_model_ids = ref([]);
+const suggested_model_ids = ref([]);
 
 const version = ref(llm_viewer_frontend_version)
 
 const is_show_help = ref(false)
+const is_loading_model = ref(false)
 
 function update_avaliable() {
     const url = 'http://' + ip_port.value + '/get_avaliable'
     axios.get(url).then(function (response) {
         console.log(response);
         avaliable_hardwares.value = response.data.avaliable_hardwares
-        avaliable_model_ids.value = response.data.avaliable_model_ids
+        suggested_model_ids.value = response.data.suggested_model_ids
     })
         .catch(function (error) {
             console.log("error in get_avaliable");
@@ -98,10 +108,23 @@ onMounted(() => {
 })
 
 var select_model_id = ref('meta-llama/Llama-2-7b-hf');
+
+function loadModel() {
+    if (!select_model_id.value || select_model_id.value.trim() === '') {
+        return;
+    }
+    console.log("Loading model:", select_model_id.value)
+    model_id.value = select_model_id.value
+    is_loading_model.value = true
+    global_update_trigger.value += 1
+    // Reset loading state after a delay (the graph component will handle the actual loading state)
+    setTimeout(() => {
+        is_loading_model.value = false
+    }, 3000)
+}
+
 watch(select_model_id, (n) => {
     console.log("select_model_id", n)
-    model_id.value = n
-    global_update_trigger.value += 1
 })
 
 var select_hardware = ref('nvidia_V100');
@@ -139,6 +162,40 @@ watch(ip_port, (n) => {
 .header_button button:active {
     color: #fff;
     background-color: #000;
+}
+
+.model-input {
+    padding: 5px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 280px;
+    margin-right: 5px;
+}
+
+.model-input:focus {
+    outline: none;
+    border-color: #4a90d9;
+    box-shadow: 0 0 3px rgba(74, 144, 217, 0.3);
+}
+
+.load-btn {
+    padding: 5px 15px;
+    background-color: #4a90d9;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.load-btn:hover {
+    background-color: #357abd;
+}
+
+.load-btn:active {
+    background-color: #2a5f8f;
 }
 
 .active {

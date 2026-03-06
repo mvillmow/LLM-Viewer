@@ -6,19 +6,21 @@ from model_analyzer import ModelAnalyzer
 from utils import str_number
 import numpy as np
 import re
-from backend_settings import avaliable_model_ids_sources
+from backend_settings import get_model_source
 
 config_cache = {}
 
 
-def get_analyer(model_id, hardware, config_path) -> ModelAnalyzer:
+def get_analyer(model_id, hardware, config_path, source=None) -> ModelAnalyzer:
     config = f"{model_id}_{hardware}_{config_path}"
     if config not in config_cache:
+        # Use provided source or get from backend_settings (defaults to huggingface)
+        model_source = source if source else get_model_source(model_id)
         config_cache[config] = ModelAnalyzer(
             model_id,
             hardware,
             config_path,
-            source=avaliable_model_ids_sources[model_id]["source"],
+            source=model_source,
         )
     return config_cache[config]
 
@@ -45,7 +47,7 @@ def get_quant_bit(dtype):
         raise ValueError(f"Unsupported dtype:{dtype}")
 
 
-def get_model_graph(model_id, hardware, config_path, inference_config):
+def get_model_graph(model_id, hardware, config_path, inference_config, source=None):
 
     # Roofline model
     w_bit = get_quant_bit(inference_config["w_quant"])
@@ -57,7 +59,7 @@ def get_model_graph(model_id, hardware, config_path, inference_config):
     gen_length = int(inference_config["gen_length"])
     tp_size = int(inference_config["tp_size"])
 
-    analyzer = get_analyer(model_id, hardware, config_path)
+    analyzer = get_analyer(model_id, hardware, config_path, source)
     result = analyzer.analyze(
         seqlen=seq_length,
         batchsize=batch_size,

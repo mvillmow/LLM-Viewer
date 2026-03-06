@@ -29,11 +29,17 @@ class ModelAnalyzer:
             # get the current file directory
             current_dir = os.path.dirname(os.path.abspath(__file__))
             # auto search the config
+            found_config = False
             for file in os.listdir(current_dir + "/configs"):
                 if file.endswith(".py") and file.replace(".py", "") in model_id:
                     config_file = "configs/" + file
+                    found_config = True
+                    break
                 # print(f"auto search config file {config_file} {file} {model_id}")
-        assert config_file is not None, "config file is not found, please specify it manually."
+            if not found_config:
+                # Use generic fallback config
+                config_file = "configs/generic.py"
+                print(f"No specific config found for {model_id}, using generic config. Results may be approximate.")
         print(f"use config file {config_file} for {model_id}")
         if source == "huggingface":
             self.model_params = AutoConfig.from_pretrained(model_id, trust_remote_code=True)
