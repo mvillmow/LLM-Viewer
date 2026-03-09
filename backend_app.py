@@ -2,7 +2,7 @@ from flask import Flask, request
 from flask import render_template
 from flask_cors import CORS
 from get_model_graph import get_model_graph
-from backend_settings import avaliable_hardwares,avaliable_model_ids
+from backend_settings import avaliable_hardwares, suggested_model_ids
 import argparse
 
 app = Flask(__name__)
@@ -14,13 +14,32 @@ def index():
     return "backend server ready."
 
 
+def normalize_hardware_name(hardware):
+    """Normalize hardware name to match backend hardware_params keys."""
+    from backend_settings import avaliable_hardwares
+    # If already valid, return as-is
+    if hardware in avaliable_hardwares:
+        return hardware
+    # Try common prefixes
+    for prefix in ['nvidia_', 'NVIDIA_']:
+        candidate = prefix + hardware
+        if candidate in avaliable_hardwares:
+            return candidate
+    # Return original if no match (will cause error downstream)
+    return hardware
+
+
 @app.route("/get_graph", methods=["POST"])
 def get_graph():
     inference_config = request.json["inference_config"]
-    nodes, edges, total_results, hardware_info = get_model_graph(
-        request.json["model_id"],
-        request.json["hardware"],
-        None,
+    model_id = request.json["model_id"]
+    hardware = normalize_hardware_name(request.json["hardware"])
+    config_path = request.json.get("config_path", None)  # Optional custom config
+    
+    nodes, edges, total_results, hardware_info, graph_info = get_model_graph(
+        model_id,
+        hardware,
+        config_path,
         inference_config,
     )
     return {
@@ -28,13 +47,14 @@ def get_graph():
         "edges": edges,
         "total_results": total_results,
         "hardware_info": hardware_info,
+        "graph_info": graph_info,
     }
 
 @app.route("/get_avaliable", methods=["GET"])
 def get_avaliable():
     return {
         "avaliable_hardwares": avaliable_hardwares,
-        "avaliable_model_ids": avaliable_model_ids,
+        "suggested_model_ids": suggested_model_ids,
     }
 
 if __name__ == "__main__":
