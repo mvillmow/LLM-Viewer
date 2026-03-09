@@ -79,3 +79,13 @@ flashattention_transformer_layer_graph = {
     "mlp_add": ["attn_add", "down_proj"],
     "output": ["mlp_add"],
 }
+
+
+def get_transformer_layer_graph(model_params):
+    """Get transformer layer graph dynamically based on model architecture."""
+    return transformer_layer_graph
+
+
+def get_flashattention_layer_graph(model_params):
+    """Get transformer layer graph with flash attention."""
+    return flashattention_transformer_layer_graph

@@ -26,20 +26,22 @@ class ModelAnalyzer:
         self.model_id = model_id
         self.hardware = hardware
         if config_file is None:
-            # get the current file directory
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            # auto search the config
-            found_config = False
-            for file in os.listdir(current_dir + "/configs"):
-                if file.endswith(".py") and file.replace(".py", "") in model_id:
-                    config_file = "configs/" + file
-                    found_config = True
-                    break
-                # print(f"auto search config file {config_file} {file} {model_id}")
-            if not found_config:
-                # Use generic fallback config
+            if source == "huggingface":
+                # For HuggingFace models, always use generic.py which auto-detects architecture
                 config_file = "configs/generic.py"
-                print(f"No specific config found for {model_id}, using generic config. Results may be approximate.")
+            else:
+                # For non-HuggingFace sources (e.g., DiT), auto-search configs
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                found_config = False
+                for file in os.listdir(current_dir + "/configs"):
+                    if file.endswith(".py") and file.replace(".py", "") in model_id:
+                        config_file = "configs/" + file
+                        found_config = True
+                        break
+                if not found_config:
+                    # Fallback for unknown non-HuggingFace sources
+                    config_file = "configs/generic.py"
+                    print(f"No specific config found for {model_id}, using generic config.")
         print(f"use config file {config_file} for {model_id}")
         if source == "huggingface":
             self.model_params = AutoConfig.from_pretrained(model_id, trust_remote_code=True)

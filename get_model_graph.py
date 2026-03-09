@@ -77,12 +77,7 @@ def get_model_graph(model_id, hardware, config_path, inference_config, source=No
         "onchip_buffer": onchip_buffer,
     }
 
-    nodes = [
-        {
-            "label": "input",
-            "id": "input",
-        }
-    ]
+    nodes = []
     edges = []
 
     def write_to_node(name, OPs, memory_access, info, input_names=[]):
@@ -100,9 +95,19 @@ def get_model_graph(model_id, hardware, config_path, inference_config, source=No
             edges.append(edge)
 
     if use_flashattention:
-        layer_graph = analyzer.config.flashattention_transformer_layer_graph
+        # Use dynamic graph generation based on model architecture
+        if hasattr(analyzer.config, 'get_flashattention_layer_graph'):
+            layer_graph = analyzer.config.get_flashattention_layer_graph(analyzer.model_params)
+        else:
+            # Fallback for configs without dynamic graph support
+            layer_graph = analyzer.config.flashattention_transformer_layer_graph
     else:
-        layer_graph = analyzer.config.transformer_layer_graph
+        # Use dynamic graph generation based on model architecture
+        if hasattr(analyzer.config, 'get_transformer_layer_graph'):
+            layer_graph = analyzer.config.get_transformer_layer_graph(analyzer.model_params)
+        else:
+            # Fallback for configs without dynamic graph support
+            layer_graph = analyzer.config.transformer_layer_graph
     stage = inference_config["stage"]
     total_results = result["total_results"]
     if stage != "chat":
@@ -116,9 +121,16 @@ def get_model_graph(model_id, hardware, config_path, inference_config, source=No
             memory_access = 0
             info = {}
         else:
-            OPs = result[name]["OPs"]
-            memory_access = result[name]["memory_access"]
-            info = result[name]
+            # Defensive handling: if node not in results, use zero values instead of crashing
+            if name not in result:
+                print(f"Warning: node '{name}' from layer_graph not found in analyzer results. This may indicate an architecture mismatch.")
+                OPs = 0
+                memory_access = 0
+                info = {}
+            else:
+                OPs = result[name]["OPs"]
+                memory_access = result[name]["memory_access"]
+                info = result[name]
         write_to_node(name, OPs, memory_access, info, input_names)
     if stage == "chat":
         # seq_length:seq_length+gen_length
@@ -151,8 +163,14 @@ def get_model_graph(model_id, hardware, config_path, inference_config, source=No
                 memory_access = 0
                 info = {}
             else:
-                OPs = result[name]["OPs"]
-                memory_access = result[name]["memory_access"]
-                info = {}
+                # Defensive handling: if node not in results, use zero values
+                if name not in result:
+                    OPs = 0
+                    memory_access = 0
+                    info = {}
+                else:
+                    OPs = result[name]["OPs"]
+                    memory_access = result[name]["memory_access"]
+                    info = {}
             write_to_node(name, OPs, memory_access, info, input_names)
     return nodes, edges, total_results, hardware_info

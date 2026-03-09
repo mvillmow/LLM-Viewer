@@ -95,6 +95,10 @@ function update_avaliable() {
         console.log(response);
         avaliable_hardwares.value = response.data.avaliable_hardwares
         suggested_model_ids.value = response.data.suggested_model_ids
+        // Set default model to first suggested model if not already set
+        if (suggested_model_ids.value.length > 0 && !select_model_id.value) {
+            select_model_id.value = suggested_model_ids.value[0]
+        }
     })
         .catch(function (error) {
             console.log("error in get_avaliable");
@@ -107,7 +111,7 @@ onMounted(() => {
     update_avaliable()
 })
 
-var select_model_id = ref('meta-llama/Llama-2-7b-hf');
+var select_model_id = ref(model_id.value);
 
 function loadModel() {
     if (!select_model_id.value || select_model_id.value.trim() === '') {
@@ -127,7 +131,7 @@ watch(select_model_id, (n) => {
     console.log("select_model_id", n)
 })
 
-var select_hardware = ref('nvidia_V100');
+var select_hardware = ref(hardware.value);
 watch(select_hardware, (n) => {
     console.log("select_hardware", n)
     hardware.value = n

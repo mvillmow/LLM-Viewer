@@ -3,6 +3,7 @@ from hardwares.hardware_params import hardware_params
 # Suggested models for autocomplete - these are pre-configured models that work well with the system
 # Users can still specify ANY HuggingFace model ID, these are just suggestions
 suggested_model_ids_sources = {
+    "LLM360/K2-Think-V2": { "source": "huggingface" },
     "meta-llama/Llama-2-7b-hf": {"source": "huggingface"},
     "meta-llama/Llama-2-13b-hf": {"source": "huggingface"},
     "meta-llama/Llama-2-70b-hf": {"source": "huggingface"},

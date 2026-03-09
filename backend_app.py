@@ -14,11 +14,26 @@ def index():
     return "backend server ready."
 
 
+def normalize_hardware_name(hardware):
+    """Normalize hardware name to match backend hardware_params keys."""
+    from backend_settings import avaliable_hardwares
+    # If already valid, return as-is
+    if hardware in avaliable_hardwares:
+        return hardware
+    # Try common prefixes
+    for prefix in ['nvidia_', 'NVIDIA_']:
+        candidate = prefix + hardware
+        if candidate in avaliable_hardwares:
+            return candidate
+    # Return original if no match (will cause error downstream)
+    return hardware
+
+
 @app.route("/get_graph", methods=["POST"])
 def get_graph():
     inference_config = request.json["inference_config"]
     model_id = request.json["model_id"]
-    hardware = request.json["hardware"]
+    hardware = normalize_hardware_name(request.json["hardware"])
     config_path = request.json.get("config_path", None)  # Optional custom config
     source = request.json.get("source", None)  # Optional custom source
     
