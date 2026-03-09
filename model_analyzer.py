@@ -19,38 +19,18 @@ ALL_DATA_NAMES = [
 
 
 class ModelAnalyzer:
-    def __init__(self, model_id, hardware, config_file=None, source="huggingface"):
+    def __init__(self, model_id, hardware, config_file=None):
         """
-        source: 'huggingface' or 'DiT'
+        HuggingFace-only model analyzer.
         """
         self.model_id = model_id
         self.hardware = hardware
         if config_file is None:
-            if source == "huggingface":
-                # For HuggingFace models, always use generic.py which auto-detects architecture
-                config_file = "configs/generic.py"
-            else:
-                # For non-HuggingFace sources (e.g., DiT), auto-search configs
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                found_config = False
-                for file in os.listdir(current_dir + "/configs"):
-                    if file.endswith(".py") and file.replace(".py", "") in model_id:
-                        config_file = "configs/" + file
-                        found_config = True
-                        break
-                if not found_config:
-                    # Fallback for unknown non-HuggingFace sources
-                    config_file = "configs/generic.py"
-                    print(f"No specific config found for {model_id}, using generic config.")
+            # Always use generic.py for HuggingFace models - it auto-detects architecture
+            config_file = "configs/generic.py"
         print(f"use config file {config_file} for {model_id}")
-        if source == "huggingface":
-            self.model_params = AutoConfig.from_pretrained(model_id, trust_remote_code=True)
-        else:
-            if not os.path.exists(f"model_params/{source}.py"):
-                raise Exception(f"model_params/{source}.py is not found")
-            # from model_params.DiT import model_params
-            module = importlib.import_module(f"model_params.{source}")
-            self.model_params = module.model_params[model_id]
+        # Always load from HuggingFace using AutoConfig
+        self.model_params = AutoConfig.from_pretrained(model_id, trust_remote_code=True)
         self.config = importlib.import_module(config_file.replace("/", ".").replace(".py", ""))
 
         # temporary variables
@@ -299,38 +279,30 @@ class ModelAnalyzer:
                 store_kv_cache=0,
             )
 
-        for name in config.get_norm_layers(model_params):
-            # sum sub pow sum div mul add
+        # Get elementwise layer specs from config for dynamic analysis
+        elementwise_layers = config.get_elementwise_layers(model_params)
+        layer_formulas = getattr(config, 'ELEMENTWISE_LAYER_FORMULAS', {})
+        
+        for name, layer_spec in elementwise_layers.items():
+            layer_type = layer_spec.get("type", "unknown")
+            formula = layer_formulas.get(layer_type, {})
+            ops_per_element = formula.get("OPs_per_element", 1)
+            
+            # Compute OPs based on layer type
+            OPs = batchsize * hidden_size * ops_per_element
+            load_act = batchsize * hidden_size * a_byte
+            # Activation layers typically have 2x activation load
+            if layer_type == "activation":
+                load_act = batchsize * hidden_size * a_byte * 2
+            store_act = batchsize * hidden_size * a_byte
+            
             self._analyze_to_results(
                 "decode",
                 name,
-                OPs=batchsize * hidden_size * 1 * 7,
+                OPs=OPs,
                 load_weight=0,
-                load_act=batchsize * hidden_size * 1 * a_byte,
-                store_act=batchsize * hidden_size * 1 * a_byte,
-                load_kv_cache=0,
-                store_kv_cache=0,
-            )
-
-        for name in ["attn_add", "mlp_add"]:
-            self._analyze_to_results(
-                "decode",
-                name,
-                OPs=batchsize * hidden_size * 1,
-                load_weight=0,
-                load_act=batchsize * hidden_size * 1 * a_byte,
-                store_act=batchsize * hidden_size * 1 * a_byte,
-                load_kv_cache=0,
-                store_kv_cache=0,
-            )
-        for name in ["mlp_act"]:
-            self._analyze_to_results(
-                "decode",
-                name,
-                OPs=batchsize * hidden_size * 1 * 2,
-                load_weight=0,
-                load_act=batchsize * hidden_size * 1 * a_byte * 2,
-                store_act=batchsize * hidden_size * 1 * a_byte,
+                load_act=load_act,
+                store_act=store_act,
                 load_kv_cache=0,
                 store_kv_cache=0,
             )
@@ -391,36 +363,25 @@ class ModelAnalyzer:
                 load_kv_cache=0,
                 store_kv_cache=0,
             )
-        for name in config.get_norm_layers(model_params):
+        # Use elementwise layer specs for prefill (same as decode but with seqlen)
+        for name, layer_spec in elementwise_layers.items():
+            layer_type = layer_spec.get("type", "unknown")
+            formula = layer_formulas.get(layer_type, {})
+            ops_per_element = formula.get("OPs_per_element", 1)
+            
+            OPs = batchsize * hidden_size * seqlen * ops_per_element
+            load_act = batchsize * hidden_size * seqlen * a_byte
+            if layer_type == "activation":
+                load_act = batchsize * hidden_size * seqlen * a_byte * 2
+            store_act = batchsize * hidden_size * seqlen * a_byte
+            
             self._analyze_to_results(
                 "prefill",
                 name,
-                OPs=batchsize * hidden_size * seqlen * 7,
+                OPs=OPs,
                 load_weight=0,
-                load_act=batchsize * hidden_size * seqlen * a_byte,
-                store_act=batchsize * hidden_size * seqlen * a_byte,
-                load_kv_cache=0,
-                store_kv_cache=0,
-            )
-        for name in ["attn_add", "mlp_add"]:
-            self._analyze_to_results(
-                "prefill",
-                name,
-                OPs=batchsize * hidden_size * seqlen * 1,
-                load_weight=0,
-                load_act=batchsize * hidden_size * seqlen * a_byte,
-                store_act=batchsize * hidden_size * seqlen * a_byte,
-                load_kv_cache=0,
-                store_kv_cache=0,
-            )
-        for name in ["mlp_act"]:
-            self._analyze_to_results(
-                "prefill",
-                name,
-                OPs=batchsize * hidden_size * seqlen * 1 * 2,
-                load_weight=0,
-                load_act=batchsize * hidden_size * seqlen * a_byte * 2,
-                store_act=batchsize * hidden_size * seqlen * a_byte,
+                load_act=load_act,
+                store_act=store_act,
                 load_kv_cache=0,
                 store_kv_cache=0,
             )

@@ -35,20 +35,19 @@ def get_graph():
     model_id = request.json["model_id"]
     hardware = normalize_hardware_name(request.json["hardware"])
     config_path = request.json.get("config_path", None)  # Optional custom config
-    source = request.json.get("source", None)  # Optional custom source
     
-    nodes, edges, total_results, hardware_info = get_model_graph(
+    nodes, edges, total_results, hardware_info, graph_info = get_model_graph(
         model_id,
         hardware,
         config_path,
         inference_config,
-        source,
     )
     return {
         "nodes": nodes,
         "edges": edges,
         "total_results": total_results,
         "hardware_info": hardware_info,
+        "graph_info": graph_info,
     }
 
 @app.route("/get_avaliable", methods=["GET"])

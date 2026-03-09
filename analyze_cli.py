@@ -12,12 +12,7 @@ parser.add_argument(
     type=str,
     help="name of hardware, for example nvidia_V100 or nvidia_A6000",
 )
-parser.add_argument(
-    "--source",
-    type=str,
-    default="huggingface",
-    help="source of model, if not huggingface, will use local model in model_params.<source>",
-)
+
 parser.add_argument("--config_file", type=str, default=None, help="config file")
 parser.add_argument("--batchsize", type=int, default=1, help="batch size")
 parser.add_argument("--seqlen", type=int, default=1024, help="sequence length")
@@ -37,7 +32,7 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-analyzer = ModelAnalyzer(args.model_id, args.hardware, args.config_file,source=args.source)
+analyzer = ModelAnalyzer(args.model_id, args.hardware, args.config_file)
 results = analyzer.analyze(
     batchsize=args.batchsize,
     seqlen=args.seqlen,

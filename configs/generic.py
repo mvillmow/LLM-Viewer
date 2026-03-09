@@ -4,6 +4,63 @@ This works for most standard causal language models (Llama-style, GPT-style, OPT
 All architecture details are dynamically derived from the HuggingFace AutoConfig object.
 """
 
+
+# ============================================================================
+# Elementwise Layer Specs for Dynamic Analyzer
+# ============================================================================
+
+def get_elementwise_layers(model_params):
+    """
+    Return elementwise (non-linear) layer specs for the analyzer.
+    This allows the analyzer to dynamically compute OPs/memory for each layer type
+    without hardcoding specific layer names.
+    
+    Returns a dict: {layer_name: {
+        "type": "norm" | "add" | "activation" | "moe_router",
+        "formula": {...}  # optional parameters for the analyzer
+    }}
+    """
+    is_parallel = detect_parallel_attention(model_params)
+    is_moe = detect_mlp_type(model_params) == 'moe'
+    norm_layers = get_norm_layers(model_params)
+    
+    layers = {}
+    
+    # Norm layers - each norm layer in the config
+    for norm_name in norm_layers:
+        layers[norm_name] = {"type": "norm"}
+    
+    # Residual adds (attn_add, mlp_add)
+    layers["attn_add"] = {"type": "add"}
+    layers["mlp_add"] = {"type": "add"}
+    
+    # MLP activations
+    layers["mlp_act"] = {"type": "activation"}
+    
+    # MoE router (if MoE)
+    if is_moe:
+        layers["moe_router"] = {"type": "moe_router"}
+    
+    return layers
+
+
+# These formulas are used by the analyzer to compute OPs for each layer type
+# They are parameterized by batchsize, seqlen, hidden_size
+ELEMENTWISE_LAYER_FORMULAS = {
+    "norm": {
+        "OPs_per_element": 7,  # sum, sub, pow, sum, div, mul, add
+    },
+    "add": {
+        "OPs_per_element": 1,  # element-wise add
+    },
+    "activation": {
+        "OPs_per_element": 2,  # typically activation + optional upsample
+    },
+    "moe_router": {
+        "OPs_per_element": 1,  # routing computation
+    },
+}
+
 # ============================================================================
 # Architecture Detection Functions
 # ============================================================================
