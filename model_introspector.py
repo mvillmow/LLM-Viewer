@@ -110,6 +110,8 @@ def _build_model_topology(model_id, model_params=None, analyzer_config=None, use
         topology_source = "fallback"
 
     nodes = _materialize_nodes(canonical_nodes)
+    edges = _augment_top_level_edges(edges, nodes)
+    edges = _normalize_edges(edges, nodes)
     combos = _build_combos(model, block_info, canonical_nodes)
     graph_info = {
         "architecture_name": model.__class__.__name__,
@@ -124,7 +126,7 @@ def _build_model_topology(model_id, model_params=None, analyzer_config=None, use
 
     return {
         "nodes": nodes,
-        "edges": _filter_edges_to_nodes(edges, nodes),
+        "edges": edges,
         "combos": combos,
         "graph_info": graph_info,
     }
@@ -508,6 +510,47 @@ def _filter_edges_to_nodes(edges, nodes):
         if edge["source"] in valid_ids and edge["target"] in valid_ids:
             filtered.append(edge)
     return filtered
+
+
+def _augment_top_level_edges(edges, nodes):
+    node_ids = {node["id"] for node in nodes}
+    augmented = list(edges)
+
+    def add_edge(source, target):
+        if source in node_ids and target in node_ids:
+            augmented.append({
+                "source": source,
+                "target": target,
+                "edgeType": "data_flow",
+            })
+
+    add_edge("embedding", "input")
+    if "final_norm" in node_ids:
+        add_edge("output", "final_norm")
+        add_edge("final_norm", "lm_head")
+    else:
+        add_edge("output", "lm_head")
+    return augmented
+
+
+def _normalize_edges(edges, nodes):
+    filtered = _filter_edges_to_nodes(edges, nodes)
+    normalized = []
+    seen = set()
+    for edge in filtered:
+        edge_type = edge.get("edgeType", "data_flow")
+        key = (edge["source"], edge["target"], edge_type)
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(
+            {
+                "source": edge["source"],
+                "target": edge["target"],
+                "edgeType": edge_type,
+            }
+        )
+    return normalized
 
 
 def _extract_dimensions(module):

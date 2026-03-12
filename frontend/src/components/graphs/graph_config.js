@@ -189,7 +189,9 @@ export const graph_config = {
     },
     comboStateStyles: {
       collapsed: {
-        lineWidth: 2,
+        lineWidth: 2.5,
+        shadowColor: '#94A3B8',
+        shadowBlur: 12,
       },
     },
     modes: {
@@ -209,6 +211,6 @@ export const graph_config = {
       rankdir: 'TB',
       nodesep: 10,
       ranksep: 20,
-      controlPoints: true,
+      controlPoints: false,
     },
 }
