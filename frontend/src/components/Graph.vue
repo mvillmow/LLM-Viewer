@@ -65,6 +65,7 @@ const selected_node_id = ref("")
 var roofline_chart = null
 
 const info_window_str = ref('')
+let pendingRefitHandle = null
 
 const changeGraphSizeWaitTimer = ref(false);
 window.onresize = () => {
@@ -100,13 +101,10 @@ function graphUpdate() {
         graph.clear()
         graph.data(graph_data)
         graph.render()
+        scheduleGraphRefit(true)
         console.log(graph_data)
         setTimeout(() => {
             update_roofline_model();
-        }, 10);
-        
-        setTimeout(() => {
-            graph.fitView();
         }, 10);
 
     })
@@ -174,6 +172,27 @@ function SelectNode(nodeId, moveView = false) {
     }
 
     selected_node_id.value = nodeId
+}
+
+
+function scheduleGraphRefit(runLayout = false) {
+    if (!graph) {
+        return;
+    }
+    if (pendingRefitHandle !== null) {
+        cancelAnimationFrame(pendingRefitHandle);
+    }
+    pendingRefitHandle = requestAnimationFrame(() => {
+        pendingRefitHandle = null;
+        if (runLayout && graph.get && graph.get('layoutController')) {
+            graph.layout();
+        }
+        setTimeout(() => {
+            if (graph) {
+                graph.fitView(20);
+            }
+        }, 40);
+    });
 }
 
 
@@ -284,8 +303,57 @@ function update_roofline_model() {
 }
 
 function release_select(){
+    if (nowFocusNode) {
+        nowFocusNode.update({
+            style: {
+                fill: nowFocusNodePrevColor,
+            },
+        });
+        nowFocusNode = null;
+        nowFocusNodePrevColor = null;
+    }
     selected_node_id.value = ""
     update_roofline_model()
+}
+
+
+function getComboAncestors(item) {
+    const ancestors = [];
+    let current = item;
+    while (current) {
+        const comboId = current.getModel()?.comboId;
+        if (!comboId) {
+            break;
+        }
+        const combo = graph.findById(comboId);
+        if (!combo) {
+            break;
+        }
+        ancestors.push(combo);
+        current = combo;
+    }
+    return ancestors;
+}
+
+
+function isSelectedNodeHiddenByCollapsedCombo() {
+    if (!selected_node_id.value || !graph) {
+        return false;
+    }
+    const node = graph.findById(selected_node_id.value);
+    if (!node) {
+        return true;
+    }
+    const comboAncestors = getComboAncestors(node);
+    return comboAncestors.some((combo) => combo.getModel()?.collapsed === true);
+}
+
+
+function handleComboCollapseExpand() {
+    if (isSelectedNodeHiddenByCollapsedCombo()) {
+        release_select();
+    }
+    scheduleGraphRefit(true);
 }
 
 function normalizeGraphData(serverGraphData) {
@@ -349,6 +417,9 @@ onMounted(() => {
     });
     graph.on('canvas:click', (event) => {
         release_select()
+    });
+    graph.on('aftercollapseexpandcombo', () => {
+        handleComboCollapseExpand();
     });
     graphUpdate(true);
 })
