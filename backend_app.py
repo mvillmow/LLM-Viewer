@@ -36,7 +36,7 @@ def get_graph():
     hardware = normalize_hardware_name(request.json["hardware"])
     config_path = request.json.get("config_path", None)  # Optional custom config
     
-    nodes, edges, total_results, hardware_info, graph_info = get_model_graph(
+    nodes, edges, combos, total_results, hardware_info, graph_info = get_model_graph(
         model_id,
         hardware,
         config_path,
@@ -45,6 +45,7 @@ def get_graph():
     return {
         "nodes": nodes,
         "edges": edges,
+        "combos": combos,
         "total_results": total_results,
         "hardware_info": hardware_info,
         "graph_info": graph_info,

@@ -459,12 +459,38 @@ def build_layer_graph(model_params, use_flashattention=False):
     return graph
 
 
+def build_layer_edges(layer_graph):
+    """Convert a node->inputs graph to edge records with residual annotations."""
+    edges = []
+    for target, input_names in layer_graph.items():
+        for source in input_names:
+            edge_type = "data_flow"
+            if target == "attn_add" and source == "input":
+                edge_type = "residual"
+            elif target == "mlp_add" and source in {"input", "attn_add"}:
+                edge_type = "residual"
+            edges.append({
+                "source": source,
+                "target": target,
+                "edgeType": edge_type,
+            })
+    return edges
+
+
 def get_transformer_layer_graph(model_params):
     return build_layer_graph(model_params, use_flashattention=False)
 
 
 def get_flashattention_layer_graph(model_params):
     return build_layer_graph(model_params, use_flashattention=True)
+
+
+def get_transformer_layer_edges(model_params):
+    return build_layer_edges(get_transformer_layer_graph(model_params))
+
+
+def get_flashattention_layer_edges(model_params):
+    return build_layer_edges(get_flashattention_layer_graph(model_params))
 
 
 # Backward compatibility

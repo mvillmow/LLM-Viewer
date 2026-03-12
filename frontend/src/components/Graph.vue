@@ -8,7 +8,7 @@
         <div class="float-search-window">
             <input type="text" v-model.lazy="searchText" placeholder="Search" />
             <div>
-                <div v-for="(value) in searchResult" @click="SelectNode(value, true)">
+                <div v-for="(value) in searchResult" :key="value" @click="SelectNode(value, true)">
                     {{ value }}
                 </div>
             </div>
@@ -32,7 +32,7 @@
 <script setup>
 import G6 from "@antv/g6"
 
-import { onMounted, onBeforeUpdate, provide } from 'vue'
+import { onMounted } from 'vue'
 import { watch, inject, ref } from 'vue'
 import { graph_config } from "./graphs/graph_config.js"
 // import { get_roofline_options } from "./graphs/roofline_config.js"
@@ -59,7 +59,7 @@ const all_node_info = ref({})
 Chart.register(...registerables, annotationPlugin);
 
 const searchText = ref('')
-var searchResult = []
+const searchResult = ref([])
 
 const selected_node_id = ref("")
 var roofline_chart = null
@@ -88,31 +88,18 @@ function graphUpdate() {
     axios.post(url, { model_id: model_id.value, hardware: hardware.value, inference_config: global_inference_config.value }).then(function (response) {
         console.log(response);
         info_window_str.value=""
-        graph_data = response.data
+        graph_data = normalizeGraphData(response.data)
+        all_node_info.value = {}
         for (let i = 0; i < graph_data.nodes.length; i++) {
             all_node_info.value[graph_data.nodes[i].id] = graph_data.nodes[i].info;
         }
-        total_results.value = response.data.total_results
-        hardware_info = response.data.hardware_info
+        total_results.value = graph_data.total_results
+        hardware_info = graph_data.hardware_info
 
-        const old_ids = new Set(graph.getNodes().map(node => node.get('id')));
-        const new_ids = new Set(graph_data.nodes.map(node => node.id));
-        const is_equal=old_ids.size === new_ids.size && [...old_ids].every(key => new_ids.has(key));
-
-        if (is_equal) {
-            // iterate each node
-            graph_data.nodes.forEach(function (node) {
-                // update the node
-                graph.updateItem(node.id, {
-                    description: node.description, label: node.label
-                });
-            });
-        } else {
-            nowFocusNode=null
-            graph.clear()
-            graph.data(graph_data)
-            graph.render()
-        }
+        nowFocusNode=null
+        graph.clear()
+        graph.data(graph_data)
+        graph.render()
         console.log(graph_data)
         setTimeout(() => {
             update_roofline_model();
@@ -143,11 +130,11 @@ function handleSearch(newText, oldText) {
         return nodeId.includes(newText)
     });
     console.log("handleSearch", nodes)
-    searchResult.length = 0
+    searchResult.value = []
     for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
         const nodeId = node.get('id');
-        searchResult.push(nodeId)
+        searchResult.value.push(nodeId)
         if (i > 100) {
             break
         }
@@ -301,6 +288,53 @@ function release_select(){
     update_roofline_model()
 }
 
+function normalizeGraphData(serverGraphData) {
+    const edgeStyles = {
+        data_flow: {
+            stroke: '#000000',
+            lineDash: null,
+        },
+        residual: {
+            stroke: '#3B82F6',
+            lineDash: [5, 5],
+        },
+    };
+
+    const nodes = (serverGraphData.nodes || []).map((node) => ({
+        ...node,
+        comboId: node.comboId || undefined,
+    }));
+    const edges = (serverGraphData.edges || []).map((edge) => {
+        const edgeType = edge.edgeType || 'data_flow';
+        const style = edgeStyles[edgeType] || edgeStyles.data_flow;
+        return {
+            ...edge,
+            edgeType,
+            style: {
+                ...(edge.style || {}),
+                stroke: style.stroke,
+                ...(style.lineDash ? { lineDash: style.lineDash } : {}),
+            },
+            labelCfg: edgeType === 'residual'
+                ? { autoRotate: true, style: { fill: '#3B82F6', fontSize: 12 } }
+                : undefined,
+        };
+    });
+    const combos = (serverGraphData.combos || []).map((combo) => ({
+        ...combo,
+        collapsed: combo.collapsed === true,
+        style: {
+            ...(combo.style || {}),
+        },
+    }));
+    return {
+        ...serverGraphData,
+        nodes,
+        edges,
+        combos,
+    };
+}
+
 onMounted(() => {
     graph = new G6.Graph(graph_config); 
     graph.on('node:click', (event) => {
@@ -317,9 +351,6 @@ onMounted(() => {
         release_select()
     });
     graphUpdate(true);
-    graph.render();
-    
-    
 })
 
 function clickNode(node) {
