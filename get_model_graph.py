@@ -48,7 +48,14 @@ def get_model_graph(model_id, hardware, config_path, inference_config):
     stage = inference_config["stage"]
 
     analyzer = get_analyer(model_id, hardware, config_path)
-    results = analyzer.analyze(
+    topology = get_model_topology(
+        model_id=model_id,
+        model_params=analyzer.model_params,
+        analyzer_config=analyzer.config,
+        use_flashattention=use_flashattention,
+    )
+    results = analyzer.analyze_dynamic(
+        topology=topology,
         seqlen=seq_length,
         batchsize=batch_size,
         w_bit=w_bit,
@@ -77,18 +84,11 @@ def get_model_graph(model_id, hardware, config_path, inference_config):
         kv_bit=kv_bit,
         use_flashattention=use_flashattention,
         tp_size=tp_size,
-    )
-
-    topology = get_model_topology(
-        model_id=model_id,
-        model_params=analyzer.model_params,
-        analyzer_config=analyzer.config,
-        use_flashattention=use_flashattention,
+        topology=topology,
     )
     nodes = _overlay_metrics_on_nodes(
         topology["nodes"],
         stage_results,
-        analyzer.get_model_info()["GQA"],
     )
     edges = topology["edges"]
     combos = topology["combos"]
@@ -109,6 +109,7 @@ def _select_stage_results(
     kv_bit,
     use_flashattention,
     tp_size,
+    topology,
 ):
     total_results = copy.deepcopy(base_results["total_results"])
     if stage != "chat":
@@ -121,7 +122,8 @@ def _select_stage_results(
         return total_results, chat_results
 
     for lengthi in np.linspace(seq_length + 1, seq_length + gen_length, n_divide):
-        gen_result = analyzer.analyze(
+        gen_result = analyzer.analyze_dynamic(
+            topology=topology,
             seqlen=int(lengthi),
             batchsize=batch_size,
             w_bit=w_bit,
@@ -143,7 +145,7 @@ def _select_stage_results(
     return total_results, chat_results
 
 
-def _overlay_metrics_on_nodes(topology_nodes, stage_results, gqa_enabled):
+def _overlay_metrics_on_nodes(topology_nodes, stage_results):
     nodes = []
     for topology_node in topology_nodes:
         node = copy.deepcopy(topology_node)
@@ -163,32 +165,28 @@ def _overlay_metrics_on_nodes(topology_nodes, stage_results, gqa_enabled):
         else:
             node["description"] = topology_info.get("module_type", topology_info.get("node_type", ""))
 
-        if gqa_enabled and node_id in {"qk_matmul", "sv_matmul"}:
-            node["label"] = f"{node['label']}(GQA)"
         nodes.append(node)
     return nodes
 
 
 def compute_graph_metadata(nodes, edges, analyzer, topology_graph_info):
-    node_ids = {node["id"] for node in nodes}
     node_counts = {
-        "total": len([node_id for node_id in node_ids if node_id not in {"input", "output"}]),
-        "input": 1 if "input" in node_ids else 0,
-        "output": 1 if "output" in node_ids else 0,
+        "total": len(nodes),
         "edges": len(edges),
     }
 
-    linear_nodes = {"q_proj", "k_proj", "v_proj", "out_proj", "gate_proj", "up_proj", "down_proj", "lm_head"}
-    attention_nodes = {"qk_matmul", "sv_matmul", "softmax", "fused_attention"}
-    norm_nodes = {"attn_norm", "mlp_norm", "final_norm"}
-    add_nodes = {"attn_add", "mlp_add"}
-    activation_nodes = {"mlp_act"}
-
-    node_counts["linear"] = len(node_ids & linear_nodes)
-    node_counts["attention"] = len(node_ids & attention_nodes)
-    node_counts["norm"] = len(node_ids & norm_nodes)
-    node_counts["add"] = len(node_ids & add_nodes)
-    node_counts["activation"] = len(node_ids & activation_nodes)
+    node_counts["linear"] = sum(1 for node in nodes if "Linear" in str(node.get("info", {}).get("module_type", "")))
+    node_counts["embedding"] = sum(1 for node in nodes if "Embedding" in str(node.get("info", {}).get("module_type", "")))
+    node_counts["norm"] = sum(
+        1
+        for node in nodes
+        if "norm" in str(node.get("info", {}).get("module_type", "")).lower()
+    )
+    node_counts["activation"] = sum(
+        1
+        for node in nodes
+        if str(node.get("info", {}).get("module_type", "")).lower() in {"gelu", "relu", "silu", "sigmoid", "tanh", "leakyrelu"}
+    )
     node_counts["residual_edges"] = sum(1 for edge in edges if edge.get("edgeType") == "residual")
 
     has_cycles, cycles = detect_cycles(edges)
@@ -205,6 +203,7 @@ def compute_graph_metadata(nodes, edges, analyzer, topology_graph_info):
                 "block_repetition_count",
                 analyzer.config.get_num_hidden_layers(analyzer.model_params),
             ),
+            "stats_source": "dynamic_topology",
         }
     )
     return graph_info
