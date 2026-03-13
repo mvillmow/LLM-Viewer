@@ -1,6 +1,6 @@
 <template>
     <div class="title">
-        <a href="https://github.com/hahnyuan/LLM-Viewer" target="_blank" class="hover-bold">LLM-Viewer</a>
+        <a href="https://github.com/mvillmow/LLM-Viewer" target="_blank" class="hover-bold">LLM-Viewer</a>
         v{{ version }}
     </div>
     <div class="header_button">
@@ -38,7 +38,7 @@
     </div>
     <div>
         <span> | </span>
-        <a href="https://github.com/hahnyuan/LLM-Viewer" target="_blank" class="hover-bold">Github Project</a>
+        <a href="https://github.com/mvillmow/LLM-Viewer" target="_blank" class="hover-bold">Github Project</a>
     </div>
     <div>
         <span> | </span>
@@ -274,3 +274,4 @@ select {
     background-color: var(--panel-input);
 }
 </style>
+
