@@ -200,18 +200,42 @@ watch(gen_length, (n) => {
 </script>
 
 <style>
+h2,
+h3 {
+    color: var(--text);
+    margin-bottom: 10px;
+}
+
+p {
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+input,
+select {
+    color: var(--text);
+    accent-color: var(--accent);
+}
 
 .config_div{
-    border-top: 1px solid #e2e2e2;
+    border-top: 1px solid var(--border);
+    padding: 12px 0;
+    color: var(--text);
 }
 
 .hover_color {
-    color: #0000ff;
+    color: var(--accent);
     cursor: pointer;
 }
+
+.hover_color:hover {
+    color: var(--accent-hover);
+}
+
 .network-wise-info-item {
     padding: 3px;
-    border-top: 1px solid #e2e2e2;
+    border-top: 1px solid var(--border);
+    color: var(--text);
 }
 
 </style>

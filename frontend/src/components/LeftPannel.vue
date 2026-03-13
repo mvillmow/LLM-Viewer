@@ -18,17 +18,21 @@ onMounted(() => {
 
 <style>
 .input_config {
-    border: 1px solid #ccc;
+    border: 1px solid var(--border);
     margin: 3px;
 }
 
 .left_control {
     align-items: left;
-    width: 20%;
+    width: 21%;
+    min-width: 280px;
     height: 100%;
-    background-color: #f0f0f0;
-    border: 3px solid #e2e2e2;
+    background: linear-gradient(180deg, var(--panel-elevated-strong) 0%, var(--panel-elevated-soft) 100%);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: var(--shadow-soft);
     overflow-y: auto;
-    margin-bottom: 10px;
+    box-sizing: border-box;
+    padding: 18px 18px 22px;
 }
 </style>
