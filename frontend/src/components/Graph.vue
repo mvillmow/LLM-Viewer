@@ -18,7 +18,8 @@
                 <strong>{{ selected_node_id }}</strong>
             </div>
             <div v-for="(value, key) in all_node_info[selected_node_id]" :key="key" class="float-node-info-item">
-                <span v-if="['bound'].includes(key)">{{ key }}: {{ value }}</span>
+                <span v-if="typeof value === 'string'">{{ key }}: {{ value }}</span>
+                <span v-else-if="['bound'].includes(key)">{{ key }}: {{ value }}</span>
                 <span v-else-if="['inference_time'].includes(key)">{{ key }}: {{ strNumberTime(value) }}</span>
                 <span v-else>{{ key }}: {{ strNumber(value) }}</span>
             </div>
@@ -34,7 +35,7 @@ import G6 from "@antv/g6"
 
 import { onMounted } from 'vue'
 import { watch, inject, ref } from 'vue'
-import { graph_config } from "./graphs/graph_config.js"
+import { getGraphConfig, getGraphTheme } from "./graphs/graph_config.js"
 // import { get_roofline_options } from "./graphs/roofline_config.js"
 import axios from 'axios'
 import { strNumber, strNumberTime } from '@/utils.js';
@@ -157,15 +158,16 @@ function SelectNode(nodeId, moveView = false) {
     }
     const node = graph.findById(nodeId)
     if (node) {
+        const theme = getGraphTheme();
         // 高亮
         if (node.getModel().style.fill) {
             nowFocusNodePrevColor = node.getModel().style.fill
         } else {
-            nowFocusNodePrevColor = "#ffffff"
+            nowFocusNodePrevColor = theme.panel
         }
         node.update({
             style: {
-                fill: "#dffdff",
+                fill: theme.selection,
             },
         });
         nowFocusNode = node
@@ -199,6 +201,7 @@ function scheduleGraphRefit(runLayout = false) {
 function update_roofline_model() {
     const ctx = document.getElementById('lineChart');
     if (ctx) {
+        const theme = getGraphTheme();
         if (roofline_chart) {
             roofline_chart.destroy();
         }
@@ -219,13 +222,15 @@ function update_roofline_model() {
                                 xMax: node_arithmetic_intensity,
                                 yMin: 0,
                                 yMax: max_OPS * 1.1,
-                                borderColor: 'blue',
+                                borderColor: theme.accent,
                                 borderWidth: 2,
                                 borderDash: [5, 5], // 虚线样式
                                 label: {
                                     enabled: true,
                                     content: 'Node AI',
-                                    position: 'top'
+                                    position: 'top',
+                                    backgroundColor: theme.accent,
+                                    color: theme.accentContrast
                                 }
                             }
                         }
@@ -247,7 +252,7 @@ function update_roofline_model() {
                         { x: x_max, y: max_OPS }
                     ],
                     // [0, max_OPS, max_OPS],
-                    borderColor: 'black',
+                    borderColor: theme.chartLine,
                     borderWidth: 2,
                     fill: false,
                     pointRadius: 0 // 不显示数据点
@@ -261,35 +266,46 @@ function update_roofline_model() {
                     x: {
                         title: {
                             display: true,
-                            text: 'Arithmetic Intensity (OPs/byte)'
+                            text: 'Arithmetic Intensity (OPs/byte)',
+                            color: theme.text
                         },
                         type: 'linear',
                         ticks: {
                             callback: function (value, index, values) {
                                 return value.toFixed(1);
-                            }
+                            },
+                            color: theme.textMuted,
                         },
                         beginAtZero: true,
-                        max: x_max
+                        max: x_max,
+                        grid: {
+                            color: theme.border,
+                        },
                     },
                     y: {
                         title: {
                             display: true,
-                            text: 'Performance (OPS)'
+                            text: 'Performance (OPS)',
+                            color: theme.text
                         },
                         ticks: {
                             callback: function (value, index, values) {
                                 return value.toExponential(1);
-                            }
+                            },
+                            color: theme.textMuted,
                         },
                         beginAtZero: true,
-                        max: max_OPS * 1.1
+                        max: max_OPS * 1.1,
+                        grid: {
+                            color: theme.border,
+                        },
                     }
                 },
                 plugins: {
                     title: {
                         display: true,
                         text: 'Roofline Model', // 这里是你想要的标题
+                        color: theme.text,
                         position: 'top' // 标题的位置，可以是'top', 'left', 'bottom', 或 'right'
                     },
                     legend: {
@@ -357,13 +373,14 @@ function handleComboCollapseExpand() {
 }
 
 function normalizeGraphData(serverGraphData) {
+    const theme = getGraphTheme();
     const edgeStyles = {
         data_flow: {
-            stroke: '#000000',
+            stroke: theme.edge,
             lineDash: null,
         },
         residual: {
-            stroke: '#3B82F6',
+            stroke: theme.edgeResidual,
             lineDash: [5, 5],
         },
     };
@@ -384,7 +401,7 @@ function normalizeGraphData(serverGraphData) {
                 ...(style.lineDash ? { lineDash: style.lineDash } : {}),
             },
             labelCfg: edgeType === 'residual'
-                ? { autoRotate: true, style: { fill: '#3B82F6', fontSize: 12 } }
+                ? { autoRotate: true, style: { fill: theme.edgeResidual, fontSize: 12 } }
                 : undefined,
         };
     });
@@ -404,7 +421,7 @@ function normalizeGraphData(serverGraphData) {
 }
 
 onMounted(() => {
-    graph = new G6.Graph(graph_config); 
+    graph = new G6.Graph(getGraphConfig()); 
     graph.on('node:click', (event) => {
         const { item } = event;
         const node = item.getModel();
@@ -445,10 +462,14 @@ function clickNode(node) {
     align-items: center;
     justify-content: center;
     float: right;
-    /* width: 85%; */
     flex-grow: 1;
-    background-color: #ffffff;
-    border: 0px;
+    background:
+        radial-gradient(circle at top right, var(--background-accent-soft), transparent 26%),
+        linear-gradient(180deg, var(--panel-elevated) 0%, var(--panel-elevated-soft) 100%);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
 }
 
 .float-search-window {
@@ -457,9 +478,15 @@ function clickNode(node) {
     right: 10px;
     height: auto;
     max-height: 50vh;
-    background-color: #f1f1f1b7;
-    padding: 3px;
+    min-width: 220px;
+    background: var(--panel-elevated);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 10px;
     overflow-y: auto;
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(12px);
+    color: var(--text);
 }
 
 
@@ -469,20 +496,66 @@ function clickNode(node) {
     left: 40%;
     height: auto;
     width: 20%;
-    background-color: #f1f1f1b7;
-    padding: 5px;
+    background: var(--panel-elevated);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 10px 14px;
     overflow-y: auto;
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(12px);
+    color: var(--text);
 }
 
 .float-node-info-window {
     position: absolute;
     top: 10px;
     left: 10px;
-    background-color: #f1f1f1b7;
+    min-width: 320px;
+    background: var(--panel-elevated);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(12px);
+    color: var(--text);
+    overflow: hidden;
 }
 
 .float-node-info-item {
-    padding: 3px;
-    border-top: 1px solid #e2e2e2;
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+}
+
+.float-node-info-item:first-child {
+    border-top: 0;
+    padding-top: 12px;
+}
+
+.float-search-window input {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel-overlay);
+    color: var(--text);
+}
+
+.float-search-window input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--focus-ring);
+}
+
+.float-search-window > div > div {
+    padding: 7px 9px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: var(--text);
+}
+
+.float-search-window > div > div:hover {
+    background-color: var(--accent-tint);
+    color: var(--accent-active);
 }
 </style>
