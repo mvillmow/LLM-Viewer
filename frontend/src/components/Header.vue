@@ -147,83 +147,109 @@ watch(ip_port, (n) => {
 </script>
 
 <style scoped>
+.header_button,
+.title,
+div {
+    color: var(--text);
+}
+
+.header_button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.header_button button,
+.model-input,
+select {
+    font-family: inherit;
+}
+
 .header_button button {
     font-size: 1.0rem;
     margin: 5px;
-    padding: 5px;
-    border-radius: 5px;
-    border: 1px solid #000000;
-    /* background-color: #fff; */
-    /* color: #000; */
+    padding: 7px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background-color: var(--panel);
+    color: var(--text);
     cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
 .header_button button:hover {
-    color: #fff;
-    background-color: #000;
+    color: var(--accent);
+    border-color: var(--accent-border-soft);
+    background-color: var(--surface-hover);
+    transform: translateY(-1px);
 }
 
 .header_button button:active {
-    color: #fff;
-    background-color: #000;
+    color: var(--accent-active);
+    background-color: var(--surface-active);
 }
 
 .model-input {
-    padding: 5px 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
     font-size: 14px;
     width: 280px;
     margin-right: 5px;
+    background-color: var(--panel-input);
+    color: var(--text);
 }
 
-.model-input:focus {
+.model-input:focus,
+select:focus,
+.load-btn:focus {
     outline: none;
-    border-color: #4a90d9;
-    box-shadow: 0 0 3px rgba(74, 144, 217, 0.3);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--focus-ring);
 }
 
 .load-btn {
-    padding: 5px 15px;
-    background-color: #4a90d9;
-    color: white;
-    border: none;
-    border-radius: 4px;
+    padding: 8px 16px;
+    background: linear-gradient(180deg, var(--accent-strong) 0%, var(--accent) 100%);
+    color: var(--accent-contrast);
+    border: 1px solid var(--accent-border-strong);
+    border-radius: 10px;
     cursor: pointer;
     font-size: 14px;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 10px 18px var(--accent-shadow);
 }
 
 .load-btn:hover {
-    background-color: #357abd;
+    background: linear-gradient(180deg, var(--accent-strong-hover) 0%, var(--accent-hover) 100%);
+    transform: translateY(-1px);
 }
 
 .load-btn:active {
-    background-color: #2a5f8f;
+    background: linear-gradient(180deg, var(--accent-strong-active) 0%, var(--accent-active) 100%);
 }
 
 .active {
-    color: #fff;
-    background-color: #5b5b5b;
+    color: var(--accent-contrast);
+    background-color: var(--accent-active);
 }
-
-
 
 .title {
     font-size: 18px;
-    /* 左对齐 */
     text-align: left;
+    font-weight: 700;
+    letter-spacing: 0.01em;
 }
 
 .hover-bold{
     color: inherit;
-    /* text-decoration: none; */
+    text-decoration-color: var(--accent-underline);
+    text-underline-offset: 0.15em;
 }
 
 .hover-bold:hover {
-    font-weight: bold;
+    color: var(--accent);
 }
-
 
 .float-info-window {
     position: absolute;
@@ -231,10 +257,20 @@ watch(ip_port, (n) => {
     left: 40%;
     height: auto;
     width: 30%;
-    background-color: #f1f1f1ed;
+    background: var(--panel-elevated);
     padding: 20px;
-    /* background-color: #fff; */
-    /* border: 2px solid #4e4e4e; */
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    color: var(--text);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(12px);
     z-index: 999;
+}
+
+select {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background-color: var(--panel-input);
 }
 </style>
