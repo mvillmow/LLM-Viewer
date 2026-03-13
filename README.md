@@ -38,7 +38,7 @@ You can click the node to get the detailed analysis of the layer.
 ## CLI Usage
 
 Clone the LLM-Viewer repository from GitHub: 
-```git clone https://github.com/hahnyuan/LLM-Viewer.git   ```
+```git clone https://github.com/mvillmow/LLM-Viewer.git   ```
 
 Install requirements
 ```pip install transformers flask flask_cors easydict```
